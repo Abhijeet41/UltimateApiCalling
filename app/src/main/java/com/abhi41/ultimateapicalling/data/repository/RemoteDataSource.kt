@@ -3,6 +3,7 @@ package com.abhi41.ultimateapicalling.data.repository
 import com.abhi41.ultimateapicalling.data.network.CountryAPi
 import com.abhi41.ultimateapicalling.data.network.dto.Country
 import com.abhi41.ultimateapicalling.data.network.dto.State
+import com.abhi41.ultimateapicalling.data.network.dto.TokenDto
 import com.abhi41.ultimateapicalling.data.network.dto.state.DistrictDto
 import retrofit2.Response
 import javax.inject.Inject
@@ -21,5 +22,9 @@ class RemoteDataSource @Inject constructor(
 
     suspend fun getDistrict(stateId: String?): Response<DistrictDto> {
         return apiCountryAPi.getDistrict(stateId)
+    }
+
+    suspend fun getTokenApi(query: Map<String, String>): Response<TokenDto> {
+        return apiCountryAPi.getTransationToken(query)
     }
 }

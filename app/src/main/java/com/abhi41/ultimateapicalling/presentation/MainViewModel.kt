@@ -7,14 +7,19 @@ import com.abhi41.ultimateapicalling.data.network.dto.Country
 import com.abhi41.ultimateapicalling.data.network.dto.CountryDto
 import com.abhi41.ultimateapicalling.data.network.dto.State
 import com.abhi41.ultimateapicalling.data.network.dto.StateDto
+import com.abhi41.ultimateapicalling.data.network.dto.TokenDto
 import com.abhi41.ultimateapicalling.data.network.dto.state.District
 import com.abhi41.ultimateapicalling.data.network.dto.state.DistrictDto
 import com.abhi41.ultimateapicalling.data.repository.RemoteDataSource
 import com.abhi41.ultimateapicalling.utils.Constants.DEFAULT_COUNTRY_ID
 import com.abhi41.ultimateapicalling.utils.NetworkResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import retrofit2.Response
 import javax.inject.Inject
 
@@ -27,19 +32,29 @@ class MainViewModel @Inject constructor(
     val countryResponse: MutableLiveData<NetworkResult<List<CountryDto>>> = MutableLiveData()
     val stateResponse: MutableLiveData<NetworkResult<List<StateDto>>> = MutableLiveData()
     val districtResponse: MutableLiveData<NetworkResult<List<District>>> = MutableLiveData()
+    val tokenResponse: MutableLiveData<NetworkResult<TokenDto>> = MutableLiveData()
 
     val mutableCountry: MutableLiveData<String> = MutableLiveData()
     val mutableStateId: MutableLiveData<String> = MutableLiveData()
 
     init {
-        viewModelScope.launch {
-            val resultCountry = async { requestCountries() }
-            val resultState = async { requestStates() }
-            val resultDistrict = async { requestDistrict() }
+        val exception = CoroutineExceptionHandler(handler = { coroutineContext, throwable ->
+        })
+        viewModelScope.launch(Dispatchers.IO + exception) {
+            /*
+                Use supervisor scope if one network request is
+                failed then it will not affect the other one.
+            */
+            supervisorScope {
 
-            resultCountry.await()
-            resultState.await()
-            resultDistrict.await()
+                val resultCountry = async { requestCountries() }
+                val resultState = async { requestStates() }
+                val resultDistrict = async { requestDistrict() }
+
+                resultCountry.await()
+                resultState.await()
+                resultDistrict.await()
+            }
         }
     }
 
@@ -76,6 +91,17 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    suspend fun requestAccessToken() {
+        tokenResponse.value = NetworkResult.Loading()
+        try {
+            val response = repository.getTokenApi(applyTokenQuery())
+            tokenResponse.value = handleResponse(response)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            tokenResponse.value = NetworkResult.Error("token not found")
+        }
+    }
+
     private fun handleCountryResponse(response: Response<Country>):
             NetworkResult<List<CountryDto>>? {
 
@@ -90,6 +116,7 @@ class MainViewModel @Inject constructor(
                 if (countries != null)
                     return NetworkResult.Success(countries)
             }
+
             else -> {
                 return NetworkResult.Error(response.message())
             }
@@ -109,6 +136,7 @@ class MainViewModel @Inject constructor(
                 if (states != null)
                     return NetworkResult.Success(states)
             }
+
             else -> {
                 return NetworkResult.Error(response.message())
             }
@@ -128,6 +156,7 @@ class MainViewModel @Inject constructor(
                 if (district != null)
                     return NetworkResult.Success(district)
             }
+
             else -> {
                 return NetworkResult.Error(response.message())
             }
@@ -139,5 +168,35 @@ class MainViewModel @Inject constructor(
         val queries: HashMap<String, String> = HashMap()
         queries["countryid"] = mutableCountry.value ?: DEFAULT_COUNTRY_ID
         return queries
+    }
+
+    fun applyTokenQuery(): HashMap<String, String> {
+        val queries: HashMap<String, String> = HashMap()
+        queries["mercid"] = "247033"
+        queries["client_id"] = "1b3817"
+        queries["client_secret"] = "5a06ee4c8ed231ef1a924cb58b885991"
+        queries["grant_type"] = "client_credentials"
+        return queries
+    }
+
+    private fun handleResponse(response: Response<TokenDto>): NetworkResult<TokenDto> {
+        when {
+            response.message().toString().contains("timeout") -> {
+                return NetworkResult.Error("Connection Timeout!")
+            }
+
+            response.isSuccessful -> {
+
+                val response = response.body()
+                val tokenDto = response!!
+                return NetworkResult.Success(tokenDto)
+
+
+            }
+
+            else -> {
+                return NetworkResult.Error(response.message())
+            }
+        }
     }
 }

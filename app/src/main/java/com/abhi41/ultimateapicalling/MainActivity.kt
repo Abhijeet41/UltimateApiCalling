@@ -16,6 +16,7 @@ import com.abhi41.ultimateapicalling.model.StateModel
 import com.abhi41.ultimateapicalling.presentation.MainViewModel
 import com.abhi41.ultimateapicalling.utils.NetworkResult
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -34,10 +35,6 @@ class MainActivity : AppCompatActivity() {
 
         observers()
         onItemSelected()
-        /*  val spnCountryAdapter =
-              ArrayAdapter(this, android.R.layout.simple_spinner_item, listOfCountry)
-          spnCountryAdapter.setDropDownViewResource(R.layout.single_country_name)
-          binding.txtCountry.setAdapter(spnCountryAdapter)*/
 
         val spnCountryAdapter = CountryAdapter(applicationContext, listOfCountry)
         binding.txtCountry.setAdapter(spnCountryAdapter)
@@ -60,6 +57,7 @@ class MainActivity : AppCompatActivity() {
                 if (selectedItem != null) {
                     binding.txtCountry.setText(listOfCountry.get(position).countryname)
                     mainViewModel.mutableCountry.value = listOfCountry.get(position).id.toString()
+                    
                     lifecycleScope.launchWhenStarted {
                         mainViewModel.requestStates()
                     }
